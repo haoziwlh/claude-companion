@@ -30,14 +30,14 @@ if (cliPath && fs.existsSync(cliPath)) {
   console.log('regex match  :', !!m);
 
   if (!m && !patched) {
-    // Show all occurrences of .companion to find the right function
+    // Find the function that reads .companion and also involves bones
+    const allBones = [];
     let i = 0;
-    while ((i = code.indexOf('.companion', i)) !== -1) {
-      const ctx = code.substring(i - 100, i + 150);
-      if (ctx.includes('bones') || ctx.includes('return{')) {
-        console.log('\ncompanion ctx:', ctx);
-      }
+    while ((i = code.indexOf('bones:', i)) !== -1) {
+      allBones.push(code.substring(i - 200, i + 200));
       i++;
     }
+    console.log('\nbones occurrences:', allBones.length);
+    allBones.forEach((ctx, n) => console.log(`\n[${n}]`, ctx));
   }
 }
