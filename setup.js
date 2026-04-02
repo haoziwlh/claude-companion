@@ -99,11 +99,12 @@ function patchCliJs(cliPath) {
 
   if (dragonStart > 0 && dragonEnd > 0) {
     const newArt = artToJs(CUSTOM_DRAGON_ART);
-    const currentArt = code.substring(dragonStart + 6, dragonEnd + 1);
+    const currentArt = code.substring(dragonStart + 6, dragonEnd);
     if (currentArt === newArt) {
       log('-', 'Dragon art already customized');
     } else {
-      code = code.substring(0, dragonStart + 6) + newArt + code.substring(dragonEnd + 1);
+      // dragonEnd points to ',[Gv8]' — keep the leading comma
+      code = code.substring(0, dragonStart + 6) + newArt + code.substring(dragonEnd);
       log('✓', 'Dragon art updated (魏征 style: 官帽 + beard)');
       changed = true;
     }
