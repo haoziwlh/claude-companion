@@ -22,19 +22,32 @@ Claude Code ships with a companion (a small creature that sits beside your input
 
 ## Usage
 
-### Interactive mode
+### npx (recommended, no install needed)
 ```bash
-node setup.js
+# Interactive mode
+npx github:haoziwlh/claude-companion
+
+# One-liner
+npx github:haoziwlh/claude-companion --name "魏征" --species dragon --rarity legendary --shiny \
+  --personality "直言敢谏的龙，见到烂代码必冒火，从不说违心话。"
+
+# Re-apply patch only (after claude updates)
+npx github:haoziwlh/claude-companion --patch-only
 ```
 
-### One-liner
+### Clone & run
 ```bash
+git clone https://github.com/haoziwlh/claude-companion.git
+cd claude-companion
+
+# Interactive mode
+node setup.js
+
+# One-liner
 node setup.js --name "魏征" --species dragon --rarity legendary --shiny \
   --personality "直言敢谏的龙，见到烂代码必冒火，从不说违心话。"
-```
 
-### Re-apply patch only (after claude updates)
-```bash
+# Re-apply patch only (after claude updates)
 node setup.js --patch-only
 ```
 
@@ -69,7 +82,7 @@ Claude Code auto-updates and will overwrite the patch. Add this to your `~/.zshr
 function claude() {
   local cli="$(npm root -g)/@anthropic-ai/claude-code/cli.js"
   if [[ -f "$cli" ]] && ! grep -q 'R.species=q.species' "$cli" 2>/dev/null; then
-    node /path/to/setup.js --patch-only
+    npx github:haoziwlh/claude-companion --patch-only &>/dev/null
   fi
   command claude "$@"
 }
