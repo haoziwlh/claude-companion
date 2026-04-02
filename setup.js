@@ -70,8 +70,8 @@ function findCliJs() {
 
 // ── Patch cli.js ──────────────────────────────────────────────────────────────
 
-const OLD_VC = 'function vC(){let q=j8().companion;if(!q)return;let{bones:K}=hR1(RR1());return{...q,...K}}';
-const NEW_VC = 'function vC(){let q=j8().companion;if(!q)return;let{bones:K}=hR1(RR1());let R={...q,...K};if(q.species)R.species=q.species;if(q.rarity)R.rarity=q.rarity;if(q.shiny!==void 0)R.shiny=q.shiny;return R}';
+// Marker injected by our patch — used to detect if already applied
+const PATCH_MARKER = 'R.species=q.species';
 
 function artToJs(art) {
   return '[' + art.map(pose => JSON.stringify(pose)).join(',') + ']';
@@ -81,15 +81,25 @@ function patchCliJs(cliPath) {
   let code = fs.readFileSync(cliPath, 'utf8');
   let changed = false;
 
-  // Patch 1: vC() override
-  if (code.includes(OLD_VC)) {
-    code = code.replace(OLD_VC, NEW_VC);
-    log('✓', 'cli.js patched (species/rarity/shiny override enabled)');
-    changed = true;
-  } else if (code.includes(NEW_VC)) {
+  // Patch 1: vC() — allow ~/.claude.json to override species/rarity/shiny.
+  // Uses regex to be resilient across minification differences between versions.
+  // Pattern: function vC(){ ... j8().companion ... hR1(RR1()) ... return{...q,...K}}
+  if (code.includes(PATCH_MARKER)) {
     log('-', 'cli.js patch already applied');
   } else {
-    log('✗', 'vC() pattern not found — cli.js version may be unsupported');
+    // Match the return statement: return{...<var1>,...<var2>}} where var2 is bones
+    const vcRegex = /(function vC\(\)\{let (\w+)=j8\(\)\.companion;if\(!\2\)return;let\{bones:(\w+)\}=hR1\(RR1\(\)\);)return\{\.\.\.\2,\.\.\.\3\}\}/;
+    const m = vcRegex.exec(code);
+    if (m) {
+      const q = m[2]; // companion var name
+      const K = m[3]; // bones var name
+      const patched = `${m[1]}let R={...${q},...${K}};if(${q}.species)R.species=${q}.species;if(${q}.rarity)R.rarity=${q}.rarity;if(${q}.shiny!==void 0)R.shiny=${q}.shiny;return R}`;
+      code = code.replace(m[0], patched);
+      log('✓', 'cli.js patched (species/rarity/shiny override enabled)');
+      changed = true;
+    } else {
+      log('✗', 'vC() pattern not found — species override unavailable (name/personality still work)');
+    }
   }
 
   // Patch 2: dragon art (only if dragon is selected)
