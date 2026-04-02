@@ -87,12 +87,16 @@ function patchCliJs(cliPath) {
   if (code.includes(PATCH_MARKER)) {
     log('-', 'cli.js patch already applied');
   } else {
-    // Match the return statement: return{...<var1>,...<var2>}} where var2 is bones
-    const vcRegex = /(function vC\(\)\{let (\w+)=j8\(\)\.companion;if\(!\2\)return;let\{bones:(\w+)\}=hR1\(RR1\(\)\);)return\{\.\.\.\2,\.\.\.\3\}\}/;
+    // Regex that doesn't rely on specific minified identifier names (j8/hR1/RR1/vC).
+    // Matches any function that:
+    //   1. reads .companion from a call
+    //   2. destructures {bones:X} from a nested call
+    //   3. returns a two-variable spread
+    const vcRegex = /(function \w+\(\)\{let (\w+)=\w+\(\)\.companion;if\(!\2\)return;let\{bones:(\w+)\}=\w+\(\w+\(\)\);)return\{\.\.\.\2,\.\.\.\3\}\}/;
     const m = vcRegex.exec(code);
     if (m) {
-      const q = m[2]; // companion var name
-      const K = m[3]; // bones var name
+      const q = m[2]; // companion var
+      const K = m[3]; // bones var
       const patched = `${m[1]}let R={...${q},...${K}};if(${q}.species)R.species=${q}.species;if(${q}.rarity)R.rarity=${q}.rarity;if(${q}.shiny!==void 0)R.shiny=${q}.shiny;return R}`;
       code = code.replace(m[0], patched);
       log('✓', 'cli.js patched (species/rarity/shiny override enabled)');
