@@ -22,22 +22,22 @@ console.log('file exists  :', cliPath ? fs.existsSync(cliPath) : false);
 
 if (cliPath && fs.existsSync(cliPath)) {
   const code = fs.readFileSync(cliPath, 'utf8');
+
+  // Version
+  const ver = code.match(/"version"\s*:\s*"([\d.]+)"/);
+  console.log('claude version:', ver ? ver[1] : 'unknown');
+
   const patched = code.includes('R.species=q.species');
   console.log('patch applied:', patched);
 
-  const vcRegex = /(function \w+\(\)\{let (\w+)=\w+\(\)\.companion;if\(!\2\)return;let\{bones:(\w+)\}=\w+\(\w+\(\)\);)return\{\.\.\.\2,\.\.\.\3\}\}/;
-  const m = vcRegex.exec(code);
-  console.log('regex match  :', !!m);
+  // Key strings
+  const keys = ['bones:', '.companion', 'companionMuted', '/buddy', 'species', 'rarity', 'hR1', 'RR1'];
+  keys.forEach(k => console.log(`has "${k}":`, code.includes(k)));
 
-  if (!m && !patched) {
-    // Find the function that reads .companion and also involves bones
-    const allBones = [];
-    let i = 0;
-    while ((i = code.indexOf('bones:', i)) !== -1) {
-      allBones.push(code.substring(i - 200, i + 200));
-      i++;
-    }
-    console.log('\nbones occurrences:', allBones.length);
-    allBones.forEach((ctx, n) => console.log(`\n[${n}]`, ctx));
+  // Find companion-related function
+  const compIdx = code.indexOf('.companion');
+  if (compIdx >= 0) {
+    console.log('\n.companion context:');
+    console.log(code.substring(compIdx - 150, compIdx + 200));
   }
 }
