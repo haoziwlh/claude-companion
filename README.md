@@ -22,7 +22,24 @@ Claude Code ships with a companion (a small creature that sits beside your input
 
 ## Usage
 
-### npx (recommended, no install needed)
+### Quick install (recommended)
+```bash
+curl -sL https://raw.githubusercontent.com/haoziwlh/claude-companion/master/setup.js -o /tmp/companion.js && node /tmp/companion.js
+```
+
+One-liner with options:
+```bash
+curl -sL https://raw.githubusercontent.com/haoziwlh/claude-companion/master/setup.js -o /tmp/companion.js && \
+  node /tmp/companion.js --name "魏征" --species dragon --rarity legendary --shiny \
+  --personality "直言敢谏的龙，见到烂代码必冒火，从不说违心话。"
+```
+
+Re-apply patch after claude updates:
+```bash
+curl -sL https://raw.githubusercontent.com/haoziwlh/claude-companion/master/setup.js -o /tmp/companion.js && node /tmp/companion.js --patch-only
+```
+
+### npx
 ```bash
 # Interactive mode
 npx github:haoziwlh/claude-companion
