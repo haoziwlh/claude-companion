@@ -1,6 +1,6 @@
 {
   "name": "cc-companion",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Customize your Claude Code companion's name, species, appearance, and personality",
   "bin": {
     "cc-companion": "setup.js",
