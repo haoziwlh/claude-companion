@@ -1,5 +1,5 @@
 {
-  "name": "claude-companion",
+  "name": "cc-companion",
   "version": "1.0.1",
   "description": "Customize your Claude Code companion's name, species, appearance, and personality",
   "bin": {
