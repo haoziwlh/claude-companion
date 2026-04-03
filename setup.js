@@ -94,7 +94,7 @@ function patchCliJs(cliPath) {
     //   1. reads .companion from a call
     //   2. destructures {bones:X} from a nested call
     //   3. returns a two-variable spread
-    const vcRegex = /(function \w+\(\)\{let (\w+)=\w+\(\)\.companion;if\(!\2\)return;let\{bones:(\w+)\}=\w+\(\w+\(\)\);)return\{\.\.\.\2,\.\.\.\3\}\}/;
+    const vcRegex = /(function [\w$]+\(\)\{let (\w+)=[\w$]+\(\)\.companion;if\(!\2\)return;let\{bones:(\w+)\}=[\w$]+\([\w$]+\(\)\);)return\{\.\.\.\2,\.\.\.\3\}\}/;
     const m = vcRegex.exec(code);
     if (m) {
       const q = m[2]; // companion var
