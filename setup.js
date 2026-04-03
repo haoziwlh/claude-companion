@@ -31,15 +31,17 @@ const RARITY_COLORS = {
   epic: 'purple', legendary: 'gold ✨'
 };
 
-// Custom dragon art (魏征 style: 官帽 + long beard)
+// Custom dragon art (魏征 style: 翅帽官帽 + long beard + cute face)
 // Each pose = array of 5 display rows. {E} = eye placeholder.
+// Hat: ,[♦], top + ==[___]== (帽翅 wings on sides)
+// Face: cute ω/^ expression; Beard: flowing ~~~
 const CUSTOM_DRAGON_ART = [
-  // Pose 1 – normal
-  ['  ,_===_,   ', '  /^\\  /^\\  ', ' ({E}  {E}) ', '  |~~~~~|   ', '  `-vvv-´   '],
-  // Pose 2 – stern (直谏)
-  ['  ,_===_,   ', '  /^\\  /^\\  ', ' ({E}><{E}) ', '  |~~~~~|   ', '  `-vvv-´   '],
-  // Pose 3 – animated
-  ['  ,_===_,   ', ' >/^\\  /^\\< ', ' ({E}  {E}) ', '  /~~~~~\\   ', '  `-vvv-´   '],
+  // Pose 1 – 端坐 (calm, normal)
+  ['  ,[♦],   ', ' ==[___]== ', ' ({E}ω{E}) ', '  ~~~~~    ', '   `-v-´  '],
+  // Pose 2 – 直谏 (stern remonstration)
+  ['  ,[♦],   ', ' ==[___]== ', ' ({E}>{E}) ', '  ~~~~~    ', '   `-!-´  '],
+  // Pose 3 – 进谏 (animated / excited)
+  [' <[♦]>    ', ' ==[___]== ', ' ({E}^{E}) ', ' /~~~~~\\  ', '   `-v-´  '],
 ];
 
 // ── Find cli.js ───────────────────────────────────────────────────────────────
