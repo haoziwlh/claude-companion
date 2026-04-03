@@ -1,14 +1,19 @@
 {
   "name": "cc-companion",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Customize your Claude Code companion's name, species, appearance, and personality",
   "bin": {
-    "claude-companion": "./setup.js"
+    "claude-companion": "setup.js"
   },
   "files": [
     "setup.js"
   ],
-  "keywords": ["claude", "claude-code", "companion", "customizer"],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "companion",
+    "customizer"
+  ],
   "author": "eddie <edolovee@gmail.com>",
   "license": "MIT",
   "engines": {
