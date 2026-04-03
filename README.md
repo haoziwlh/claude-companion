@@ -22,7 +22,20 @@ Claude Code ships with a companion (a small creature that sits beside your input
 
 ## Usage
 
-### Quick install (recommended)
+### npm (recommended)
+```bash
+# Interactive mode
+npx cc-companion
+
+# One-liner
+npx cc-companion --name "魏征" --species dragon --rarity legendary --shiny \
+  --personality "直言敢谏的龙，见到烂代码必冒火，从不说违心话。"
+
+# Re-apply patch only (after claude updates)
+npx cc-companion --patch-only
+```
+
+### Quick install (curl)
 ```bash
 curl -sL https://raw.githubusercontent.com/haoziwlh/claude-companion/master/setup.js -o /tmp/companion.js && node /tmp/companion.js
 ```
@@ -37,19 +50,6 @@ curl -sL https://raw.githubusercontent.com/haoziwlh/claude-companion/master/setu
 Re-apply patch after claude updates:
 ```bash
 curl -sL https://raw.githubusercontent.com/haoziwlh/claude-companion/master/setup.js -o /tmp/companion.js && node /tmp/companion.js --patch-only
-```
-
-### npx
-```bash
-# Interactive mode
-npx github:haoziwlh/claude-companion
-
-# One-liner
-npx github:haoziwlh/claude-companion --name "魏征" --species dragon --rarity legendary --shiny \
-  --personality "直言敢谏的龙，见到烂代码必冒火，从不说违心话。"
-
-# Re-apply patch only (after claude updates)
-npx github:haoziwlh/claude-companion --patch-only
 ```
 
 ### Clone & run
@@ -99,7 +99,7 @@ Claude Code auto-updates and will overwrite the patch. Add this to your `~/.zshr
 function claude() {
   local cli="$(npm root -g)/@anthropic-ai/claude-code/cli.js"
   if [[ -f "$cli" ]] && ! grep -q 'R.species=q.species' "$cli" 2>/dev/null; then
-    npx github:haoziwlh/claude-companion --patch-only &>/dev/null
+    npx cc-companion --patch-only &>/dev/null
   fi
   command claude "$@"
 }

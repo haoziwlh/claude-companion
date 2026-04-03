@@ -1,6 +1,6 @@
 {
   "name": "cc-companion",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Customize your Claude Code companion's name, species, appearance, and personality",
   "bin": {
     "claude-companion": "setup.js"
@@ -18,5 +18,6 @@
   "license": "MIT",
   "engines": {
     "node": ">=16"
-  }
+  },
+  "main": "setup.js"
 }
