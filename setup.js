@@ -1,307 +1,136 @@
 #!/usr/bin/env node
 /**
- * Claude Code Companion Customizer
+ * cc-statusline installer
  *
- * Customize your Claude Code companion's name, species, rarity, and personality.
- * Works by patching the local claude-code cli.js to allow ~/.claude.json overrides.
+ * Copies statusline.sh into ~/.claude/ and wires it into
+ * ~/.claude/settings.json via the statusLine field. Idempotent.
  *
  * Usage:
- *   node setup.js                          # interactive mode
- *   node setup.js --name "魏征" --species dragon --rarity legendary --shiny
- *   node setup.js --patch-only             # just re-apply the cli.js patch
+ *   npx cc-statusline              # install / update
+ *   npx cc-statusline --uninstall  # remove
  */
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
-const readline = require('readline');
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-const SPECIES = [
-  'duck','goose','blob','cat','dragon','octopus','owl','penguin',
-  'turtle','snail','ghost','axolotl','capybara','cactus','robot',
-  'rabbit','mushroom','chonk'
-];
-
-const RARITIES = ['common','uncommon','rare','epic','legendary'];
-
-const RARITY_COLORS = {
-  common: 'gray', uncommon: 'green', rare: 'blue',
-  epic: 'purple', legendary: 'gold ✨'
-};
-
-// Custom dragon art (魏征 style: 翅帽官帽 + long beard + cute face)
-// Each pose = array of 5 display rows. {E} = eye placeholder.
-// Hat: ,[♦], top + ==[___]== (帽翅 wings on sides)
-// Face: cute ω/^ expression; Beard: flowing ~~~
-const CUSTOM_DRAGON_ART = [
-  // Pose 1 – 端坐 (calm, normal)
-  ['  ,[♦],   ', ' ==[___]== ', ' ({E}ω{E}) ', '  ~~~~~    ', '   `-v-´  '],
-  // Pose 2 – 直谏 (stern remonstration)
-  ['  ,[♦],   ', ' ==[___]== ', ' ({E}>{E}) ', '  ~~~~~    ', '   `-!-´  '],
-  // Pose 3 – 进谏 (animated / excited)
-  [' <[♦]>    ', ' ==[___]== ', ' ({E}^{E}) ', ' /~~~~~\\  ', '   `-v-´  '],
-];
-
-// ── Find cli.js ───────────────────────────────────────────────────────────────
-
-function findCliJs() {
-  // Try resolving the `claude` binary symlink
-  try {
-    const claudeBin = execSync('which claude 2>/dev/null', { encoding: 'utf8' }).trim();
-    if (claudeBin) {
-      const real = fs.realpathSync(claudeBin);
-      if (real.endsWith('cli.js') && fs.existsSync(real)) return real;
-      // symlink points to a wrapper; walk up to find the package
-      const pkg = path.resolve(path.dirname(real), '..', 'lib', 'node_modules',
-                               '@anthropic-ai', 'claude-code', 'cli.js');
-      if (fs.existsSync(pkg)) return pkg;
-    }
-  } catch {}
-
-  // npm global root
-  try {
-    const root = execSync('npm root -g 2>/dev/null', { encoding: 'utf8' }).trim();
-    const p = path.join(root, '@anthropic-ai', 'claude-code', 'cli.js');
-    if (fs.existsSync(p)) return p;
-  } catch {}
-
-  return null;
-}
-
-// ── Patch cli.js ──────────────────────────────────────────────────────────────
-
-// Marker injected by our patch — used to detect if already applied
-const PATCH_MARKER = 'R.species=q.species';
-
-function artToJs(art) {
-  return '[' + art.map(pose => JSON.stringify(pose)).join(',') + ']';
-}
-
-function patchCliJs(cliPath) {
-  let code = fs.readFileSync(cliPath, 'utf8');
-  let changed = false;
-
-  // Patch 1: vC() — allow ~/.claude.json to override species/rarity/shiny.
-  // Uses regex to be resilient across minification differences between versions.
-  // Pattern: function vC(){ ... j8().companion ... hR1(RR1()) ... return{...q,...K}}
-  if (code.includes(PATCH_MARKER)) {
-    log('-', 'cli.js patch already applied');
-  } else {
-    // Regex that doesn't rely on specific minified identifier names (j8/hR1/RR1/vC).
-    // Matches any function that:
-    //   1. reads .companion from a call
-    //   2. destructures {bones:X} from a nested call
-    //   3. returns a two-variable spread
-    const vcRegex = /(function [\w$]+\(\)\{let (\w+)=[\w$]+\(\)\.companion;if\(!\2\)return;let\{bones:(\w+)\}=[\w$]+\([\w$]+\(\)\);)return\{\.\.\.\2,\.\.\.\3\}\}/;
-    const m = vcRegex.exec(code);
-    if (m) {
-      const q = m[2]; // companion var
-      const K = m[3]; // bones var
-      const patched = `${m[1]}let R={...${q},...${K}};if(${q}.species)R.species=${q}.species;if(${q}.rarity)R.rarity=${q}.rarity;if(${q}.shiny!==void 0)R.shiny=${q}.shiny;return R}`;
-      code = code.replace(m[0], patched);
-      log('✓', 'cli.js patched (species/rarity/shiny override enabled)');
-      changed = true;
-    } else {
-      log('✗', 'vC() pattern not found — species override unavailable (name/personality still work)');
-    }
-  }
-
-  // Patch 2: dragon art (only if dragon is selected)
-  const rfkIdx = code.indexOf('RFK={');
-  const dragonStart = rfkIdx >= 0 ? code.indexOf('[Zv8]', rfkIdx) : -1;
-  const dragonEnd   = dragonStart >= 0 ? code.indexOf(',[Gv8]', dragonStart) : -1;
-
-  if (dragonStart > 0 && dragonEnd > 0) {
-    const newArt = artToJs(CUSTOM_DRAGON_ART);
-    const currentArt = code.substring(dragonStart + 6, dragonEnd);
-    if (currentArt === newArt) {
-      log('-', 'Dragon art already customized');
-    } else {
-      // dragonEnd points to ',[Gv8]' — keep the leading comma
-      code = code.substring(0, dragonStart + 6) + newArt + code.substring(dragonEnd);
-      log('✓', 'Dragon art updated (魏征 style: 官帽 + beard)');
-      changed = true;
-    }
-  }
-
-  if (changed) fs.writeFileSync(cliPath, code);
-  return changed;
-}
-
-// ── Update ~/.claude.json ─────────────────────────────────────────────────────
-
-function updateCompanion(settings) {
-  const claudeJson = path.join(process.env.HOME, '.claude.json');
-  let data = {};
-  try { data = JSON.parse(fs.readFileSync(claudeJson, 'utf8')); } catch {}
-
-  const prev = data.companion || {};
-  const next = { ...prev };
-  if (settings.name)        next.name        = settings.name;
-  if (settings.personality) next.personality  = settings.personality;
-  if (settings.species)     next.species      = settings.species;
-  if (settings.rarity)      next.rarity       = settings.rarity;
-  if (settings.shiny !== undefined) next.shiny = settings.shiny;
-
-  data.companion = next;
-  fs.writeFileSync(claudeJson, JSON.stringify(data, null, 4));
-  log('✓', `~/.claude.json updated → name="${next.name}" species=${next.species} rarity=${next.rarity}${next.shiny ? ' ✨' : ''}`);
-}
-
-// ── Generate ~/.claude/patch-companion.js ────────────────────────────────────
-
-function writePatchScript(cliPath) {
-  const patchScriptPath = path.join(process.env.HOME, '.claude', 'patch-companion.js');
-  const content = `#!/usr/bin/env node
-// Auto-generated by cc-companion — re-patches cli.js after claude updates
-const fs = require('fs');
-
-const cliPath = ${JSON.stringify(cliPath)};
-let code = fs.readFileSync(cliPath, 'utf8');
-let changed = false;
-
-// Patch 1: companion function — allow ~/.claude.json to override species/rarity/shiny
-// Uses regex to be resilient across minification/version differences
-const PATCH_MARKER = 'R.species=q.species';
-const vcRegex = /(function [\\w$]+\\(\\)\\{let (\\w+)=[\\w$]+\\(\\)\\.companion;if\\(!\\2\\)return;let\\{bones:(\\w+)\\}=[\\w$]+\\([\\w$]+\\(\\)\\);)return\\{\\.\\.\\.\\2,\\.\\.\\.\\3\\}\\}/;
-
-if (code.includes(PATCH_MARKER)) {
-  console.log('- companion function already patched');
-} else {
-  const m = vcRegex.exec(code);
-  if (m) {
-    const q = m[2], K = m[3];
-    const patched = \`\${m[1]}let R={...\${q},...\${K}};if(\${q}.species)R.species=\${q}.species;if(\${q}.rarity)R.rarity=\${q}.rarity;if(\${q}.shiny!==void 0)R.shiny=\${q}.shiny;return R}\`;
-    code = code.replace(m[0], patched);
-    console.log('\\u2713 companion function patched');
-    changed = true;
-  } else {
-    console.log('\\u2717 companion function pattern not found (version may have changed)');
-  }
-}
-
-if (changed) fs.writeFileSync(cliPath, code);
-`;
-  fs.mkdirSync(path.dirname(patchScriptPath), { recursive: true });
-  fs.writeFileSync(patchScriptPath, content);
-  return patchScriptPath;
-}
-
-// ── Shell wrapper hint ────────────────────────────────────────────────────────
-
-function printShellWrapper(cliPath) {
-  const patchScriptPath = writePatchScript(cliPath);
-  log('✓', `patch script written → ${patchScriptPath}`);
-  console.log(`
-To auto-re-patch after claude updates, add this to ~/.zshrc or ~/.bashrc:
-
-  function claude() {
-    if ! grep -q 'R.species=q.species' "${cliPath}" 2>/dev/null; then
-      node "${patchScriptPath}"
-    fi
-    command claude "$@"
-  }
-`);
-}
-
-// ── Interactive ───────────────────────────────────────────────────────────────
-
-function ask(rl, question) {
-  return new Promise(r => rl.question(question, a => r(a.trim())));
-}
-
-async function interactive() {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-
-  console.log('\nAvailable species:');
-  console.log(' ', SPECIES.join(', '));
-  const species = await ask(rl, 'Species (default: turtle): ');
-
-  console.log('\nAvailable rarities (affects color):');
-  Object.entries(RARITY_COLORS).forEach(([r, c]) => console.log(`  ${r} → ${c}`));
-  const rarity = await ask(rl, 'Rarity (default: common): ');
-
-  const shinyInput = await ask(rl, 'Shiny? ✨  (y/N): ');
-  const name = await ask(rl, 'Companion name (default: keep current): ');
-  const personality = await ask(rl, 'Personality one-liner (leave blank to keep current): ');
-
-  rl.close();
-
-  return {
-    species:     SPECIES.includes(species)  ? species  : undefined,
-    rarity:      RARITIES.includes(rarity)  ? rarity   : undefined,
-    shiny:       shinyInput.toLowerCase() === 'y' ? true : undefined,
-    name:        name        || undefined,
-    personality: personality || undefined,
-  };
-}
-
-// ── Args ──────────────────────────────────────────────────────────────────────
-
-function parseArgs() {
-  const args = process.argv.slice(2);
-  const get  = f => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : undefined; };
-  return {
-    name:        get('--name'),
-    species:     get('--species'),
-    rarity:      get('--rarity'),
-    personality: get('--personality'),
-    shiny:       args.includes('--shiny') ? true : undefined,
-    patchOnly:   args.includes('--patch-only'),
-    interactive: args.length === 0,
-  };
-}
-
-// ── Logging ───────────────────────────────────────────────────────────────────
+const HOME = process.env.HOME || process.env.USERPROFILE;
+const CLAUDE_DIR = path.join(HOME, '.claude');
+const SETTINGS_JSON = path.join(CLAUDE_DIR, 'settings.json');
+const TARGET_SCRIPT = path.join(CLAUDE_DIR, 'statusline.sh');
+const SOURCE_SCRIPT = path.join(__dirname, 'statusline.sh');
 
 function log(icon, msg) { console.log(`  ${icon} ${msg}`); }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// ── Install script ───────────────────────────────────────────────────────────
 
-async function main() {
-  const args = parseArgs();
+function installScript() {
+  fs.mkdirSync(CLAUDE_DIR, { recursive: true });
 
-  console.log('\n🐉 Claude Code Companion Customizer\n');
-
-  // Step 1: find cli.js
-  process.stdout.write('[1] Finding claude-code... ');
-  const cliPath = findCliJs();
-  if (!cliPath) {
-    console.log('');
-    log('✗', 'claude-code not found. Install it with: npm install -g @anthropic-ai/claude-code');
-    process.exit(1);
+  if (!fs.existsSync(SOURCE_SCRIPT)) {
+    throw new Error(`statusline.sh not found at ${SOURCE_SCRIPT}`);
   }
-  console.log('found\n');
+  const source = fs.readFileSync(SOURCE_SCRIPT, 'utf8');
+  const existing = fs.existsSync(TARGET_SCRIPT) ? fs.readFileSync(TARGET_SCRIPT, 'utf8') : null;
 
-  // Step 2: patch cli.js
-  console.log('[2] Patching cli.js...');
-  patchCliJs(cliPath);
+  if (existing === source) {
+    log('-', `${TARGET_SCRIPT} already up-to-date`);
+    return false;
+  }
 
-  if (args.patchOnly) {
-    console.log('\nPatch complete.\n');
+  fs.writeFileSync(TARGET_SCRIPT, source);
+  fs.chmodSync(TARGET_SCRIPT, 0o755);
+  log('✓', `${TARGET_SCRIPT} installed`);
+  return true;
+}
+
+// ── Configure settings.json ──────────────────────────────────────────────────
+
+function loadSettings() {
+  if (!fs.existsSync(SETTINGS_JSON)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(SETTINGS_JSON, 'utf8'));
+  } catch (e) {
+    throw new Error(`~/.claude/settings.json is not valid JSON: ${e.message}`);
+  }
+}
+
+function saveSettings(settings) {
+  fs.writeFileSync(SETTINGS_JSON, JSON.stringify(settings, null, 2));
+}
+
+function configureSettings() {
+  const settings = loadSettings();
+  const desired = { type: 'command', command: `bash ${TARGET_SCRIPT}` };
+
+  if (settings.statusLine &&
+      settings.statusLine.type === desired.type &&
+      settings.statusLine.command === desired.command) {
+    log('-', 'settings.json statusLine already configured');
+    return false;
+  }
+
+  settings.statusLine = desired;
+  saveSettings(settings);
+  log('✓', 'settings.json statusLine configured');
+  return true;
+}
+
+// ── Uninstall ────────────────────────────────────────────────────────────────
+
+function uninstall() {
+  console.log('\n🗑  cc-statusline uninstaller\n');
+
+  if (fs.existsSync(TARGET_SCRIPT)) {
+    fs.unlinkSync(TARGET_SCRIPT);
+    log('✓', `removed ${TARGET_SCRIPT}`);
+  } else {
+    log('-', 'statusline.sh not found');
+  }
+
+  if (fs.existsSync(SETTINGS_JSON)) {
+    const settings = loadSettings();
+    if (settings.statusLine && (settings.statusLine.command || '').includes('statusline.sh')) {
+      delete settings.statusLine;
+      saveSettings(settings);
+      log('✓', 'removed statusLine from settings.json');
+    } else {
+      log('-', 'no matching statusLine in settings.json');
+    }
+  }
+
+  console.log('\nDone. Start a new claude session to see the default statusline.\n');
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
+
+function main() {
+  const args = process.argv.slice(2);
+
+  if (args.includes('--uninstall') || args.includes('-u')) {
+    uninstall();
     return;
   }
 
-  // Step 3: collect settings
-  let settings = args;
-  if (args.interactive) {
-    console.log('\n[3] Configure your companion:');
-    settings = await interactive();
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(`
+cc-statusline — Claude Code statusline with path, git, model,
+context usage, 5h/7d rate-limit usage, and session cost.
+
+Usage:
+  npx cc-statusline              install / update
+  npx cc-statusline --uninstall  remove
+  npx cc-statusline --help       show this
+`);
+    return;
   }
 
-  // Step 4: update ~/.claude.json
-  console.log('\n[4] Updating companion config...');
-  const hasSettings = Object.values(settings).some(v => v !== undefined);
-  if (hasSettings) {
-    updateCompanion(settings);
-  } else {
-    log('-', 'No changes to companion config');
-  }
-
-  console.log('\n✅ Done! Start a new claude session and run /buddy pet\n');
-  printShellWrapper(cliPath);
+  console.log('\n📊 cc-statusline installer\n');
+  console.log('[1] Installing statusline script...');
+  installScript();
+  console.log('\n[2] Configuring ~/.claude/settings.json...');
+  configureSettings();
+  console.log('\n✅ Done. Start a new claude session or press shift+tab to redraw.\n');
 }
 
-main().catch(err => { console.error(err.message); process.exit(1); });
+try { main(); }
+catch (err) { console.error(`\n✗ ${err.message}\n`); process.exit(1); }

@@ -1,24 +1,35 @@
 {
-  "name": "cc-companion",
-  "version": "1.0.6",
-  "description": "Customize your Claude Code companion's name, species, appearance, and personality",
+  "name": "cc-statusline",
+  "version": "2.0.0",
+  "description": "Claude Code statusline showing path, git, model, context window usage, 5h/7d rate-limit usage, and session cost",
   "bin": {
-    "cc-companion": "setup.js",
-    "claude-companion": "setup.js"
+    "cc-statusline": "setup.js"
   },
   "files": [
-    "setup.js"
+    "setup.js",
+    "diagnose.js",
+    "statusline.sh",
+    "README.md"
   ],
+  "scripts": {
+    "diagnose": "node diagnose.js"
+  },
   "keywords": [
     "claude",
     "claude-code",
-    "companion",
-    "customizer"
+    "statusline",
+    "usage",
+    "rate-limit",
+    "git"
   ],
   "author": "eddie <edolovee@gmail.com>",
   "license": "MIT",
   "engines": {
     "node": ">=16"
   },
-  "main": "setup.js"
+  "main": "setup.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/haoziwlh/cc-statusline.git"
+  }
 }

@@ -1,43 +1,45 @@
 #!/usr/bin/env node
-const { execSync } = require('child_process');
+/**
+ * cc-statusline diagnose — checks installation health.
+ */
 const fs = require('fs');
 const path = require('path');
 
-let cliPath;
-try {
-  const bin = execSync('which claude', { encoding: 'utf8' }).trim();
-  const real = fs.realpathSync(bin);
-  cliPath = real.endsWith('cli.js') ? real : null;
-} catch {}
+const HOME = process.env.HOME || process.env.USERPROFILE;
+const CLAUDE_DIR = path.join(HOME, '.claude');
+const SETTINGS_JSON = path.join(CLAUDE_DIR, 'settings.json');
+const TARGET_SCRIPT = path.join(CLAUDE_DIR, 'statusline.sh');
 
-if (!cliPath) {
+function check(label, ok, detail) {
+  console.log(`  ${ok ? '✓' : '✗'} ${label}${detail ? ` — ${detail}` : ''}`);
+}
+
+console.log('\n📊 cc-statusline diagnose\n');
+
+const scriptExists = fs.existsSync(TARGET_SCRIPT);
+check('statusline script', scriptExists, TARGET_SCRIPT);
+
+let scriptExecutable = false;
+if (scriptExists) {
   try {
-    const root = execSync('npm root -g', { encoding: 'utf8' }).trim();
-    cliPath = path.join(root, '@anthropic-ai/claude-code/cli.js');
+    const mode = fs.statSync(TARGET_SCRIPT).mode;
+    scriptExecutable = (mode & 0o111) !== 0;
   } catch {}
+  check('script is executable', scriptExecutable);
 }
 
-console.log('cli.js path :', cliPath);
-console.log('file exists  :', cliPath ? fs.existsSync(cliPath) : false);
+let settings = null;
+try { settings = JSON.parse(fs.readFileSync(SETTINGS_JSON, 'utf8')); } catch {}
+const statusOk = !!(settings && settings.statusLine && settings.statusLine.command &&
+  settings.statusLine.command.includes('statusline.sh'));
+check('settings.json statusLine', statusOk,
+  statusOk ? settings.statusLine.command : 'not configured');
 
-if (cliPath && fs.existsSync(cliPath)) {
-  const code = fs.readFileSync(cliPath, 'utf8');
-
-  // Version
-  const ver = code.match(/"version"\s*:\s*"([\d.]+)"/);
-  console.log('claude version:', ver ? ver[1] : 'unknown');
-
-  const patched = code.includes('R.species=q.species');
-  console.log('patch applied:', patched);
-
-  // Key strings
-  const keys = ['bones:', '.companion', 'companionMuted', '/buddy', 'species', 'rarity', 'hR1', 'RR1'];
-  keys.forEach(k => console.log(`has "${k}":`, code.includes(k)));
-
-  // Find companion-related function
-  const compIdx = code.indexOf('.companion');
-  if (compIdx >= 0) {
-    console.log('\n.companion context:');
-    console.log(code.substring(compIdx - 150, compIdx + 200));
-  }
+const healthy = scriptExists && scriptExecutable && statusOk;
+console.log('');
+if (healthy) {
+  console.log('  All good. Start a new claude session or press shift+tab to redraw.');
+} else {
+  console.log('  Run: npx cc-statusline');
 }
+console.log('');

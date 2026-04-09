@@ -1,118 +1,83 @@
-# Claude Code Companion Customizer
+# cc-statusline
 
-Customize your [Claude Code](https://claude.ai/code) companion's name, species, appearance, and personality.
+A drop-in statusline for [Claude Code](https://claude.ai/code) showing everything you actually want to know at a glance:
 
-> Built while customizing a dragon named 魏征 (Wei Zheng) — the famously blunt Tang Dynasty minister who never sugarcoated anything.
+```
+~/github/project │  main ✓ │ ◆ Opus 4.6 · ctx:58% │ 5h:14% 7d:66% │ $4.91
+```
 
-![demo](https://img.shields.io/badge/species-dragon-gold)
+- **Current path** (with `~` shorthand)
+- **Git branch + status** — green ✓ when clean, yellow ● when dirty
+- **Model + context window %** — how full your session context is (color-coded)
+- **5h / 7d usage %** — real numbers from Claude Code's own `/usage` source of truth, not local estimates
+- **Session cost** — `$X.XX` for the current session
+
+All segments auto-hide when their data isn't available (e.g. outside a git repo, or before the first message in a new session).
+
+## Install
+
+```bash
+npx cc-statusline
+```
+
+That's it. Start a new `claude` session (or press `shift+tab` to force a redraw) and you'll see the new statusline.
 
 ## What it does
 
-Claude Code ships with a companion (a small creature that sits beside your input and occasionally comments on your code). By default it's randomly assigned. This script lets you:
+1. Copies `statusline.sh` to `~/.claude/statusline.sh`
+2. Sets `statusLine` in `~/.claude/settings.json` to run that script
 
-- Change the **name** and **personality**
-- Change the **species** (18 options)
-- Set **rarity** to control the color (legendary = gold)
-- Enable the **✨ shiny** badge
+Both steps are idempotent — re-running `npx cc-statusline` is safe and will only overwrite if the script changed.
+
+## How the 5h / 7d numbers work
+
+Claude Code pipes a session JSON into every statusline render. In recent versions (2.1.x+) that JSON includes a `rate_limits` field populated from the same backend that powers the `/usage` dialog — so the numbers you see in the statusline match `/usage` exactly. No local estimation, no API calls, no auth.
+
+The `rate_limits` field is only populated **after the first message in a session**, so new sessions briefly show no 5h/7d segment. This is expected.
+
+## Uninstall
+
+```bash
+npx cc-statusline --uninstall
+```
+
+Removes `~/.claude/statusline.sh` and the `statusLine` entry from `~/.claude/settings.json`. Leaves everything else alone.
+
+## Diagnose
+
+```bash
+node $(npm root -g)/cc-statusline/diagnose.js
+```
+
+Checks that the script is installed, executable, and wired into `settings.json`.
 
 ## Requirements
 
-- Node.js
-- `@anthropic-ai/claude-code` installed globally (`npm install -g @anthropic-ai/claude-code`)
+- Claude Code 2.1.x or newer (for the `rate_limits` and `context_window` fields in statusline stdin)
+- Node.js 16+
+- Bash and `git` on PATH
 
-## Usage
+## Color thresholds
 
-### npm (recommended)
-```bash
-# Interactive mode
-npx cc-companion
+Percentage segments use these thresholds:
 
-# One-liner
-npx cc-companion --name "魏征" --species dragon --rarity legendary --shiny \
-  --personality "直言敢谏的龙，见到烂代码必冒火，从不说违心话。"
+| Range     | Color  |
+|-----------|--------|
+| < 70%     | green  |
+| 70–89%    | yellow |
+| ≥ 90%     | red    |
 
-# Re-apply patch only (after claude updates)
-npx cc-companion --patch-only
-```
+Applies to `ctx:` (context window), `5h:`, and `7d:`.
 
-### Quick install (curl)
-```bash
-curl -sL https://raw.githubusercontent.com/haoziwlh/claude-companion/master/setup.js -o /tmp/companion.js && node /tmp/companion.js
-```
+## Customize
 
-One-liner with options:
-```bash
-curl -sL https://raw.githubusercontent.com/haoziwlh/claude-companion/master/setup.js -o /tmp/companion.js && \
-  node /tmp/companion.js --name "魏征" --species dragon --rarity legendary --shiny \
-  --personality "直言敢谏的龙，见到烂代码必冒火，从不说违心话。"
-```
+The statusline is a single bash script at `~/.claude/statusline.sh`. Edit it directly to reorder, add, or remove segments. Re-running `npx cc-statusline` will overwrite your edits, so copy the file if you want to preserve customizations.
 
-Re-apply patch after claude updates:
-```bash
-curl -sL https://raw.githubusercontent.com/haoziwlh/claude-companion/master/setup.js -o /tmp/companion.js && node /tmp/companion.js --patch-only
-```
+## Repository
 
-### Clone & run
-```bash
-git clone https://github.com/haoziwlh/claude-companion.git
-cd claude-companion
+Source: [github.com/haoziwlh/claude-statusline](https://github.com/haoziwlh/claude-statusline)  
+Package: `cc-statusline` on npm
 
-# Interactive mode
-node setup.js
+## License
 
-# One-liner
-node setup.js --name "魏征" --species dragon --rarity legendary --shiny \
-  --personality "直言敢谏的龙，见到烂代码必冒火，从不说违心话。"
-
-# Re-apply patch only (after claude updates)
-node setup.js --patch-only
-```
-
-## Options
-
-| Flag | Values | Description |
-|------|--------|-------------|
-| `--name` | any string | Companion name |
-| `--species` | see below | Visual appearance |
-| `--rarity` | see below | Color theme |
-| `--shiny` | (flag) | Adds ✨ SHINY ✨ badge |
-| `--personality` | one sentence | Shown in the companion card |
-| `--patch-only` | (flag) | Only patch cli.js, skip config |
-
-### Species
-`duck` `goose` `blob` `cat` `dragon` `octopus` `owl` `penguin` `turtle` `snail` `ghost` `axolotl` `capybara` `cactus` `robot` `rabbit` `mushroom` `chonk`
-
-### Rarities & colors
-| Rarity | Color |
-|--------|-------|
-| common | gray |
-| uncommon | green |
-| rare | blue |
-| epic | purple |
-| **legendary** | **gold** |
-
-## After claude auto-updates
-
-Claude Code auto-updates and will overwrite the patch. Add this to your `~/.zshrc` or `~/.bashrc` to auto-re-patch on start:
-
-```bash
-function claude() {
-  local cli="$(npm root -g)/@anthropic-ai/claude-code/cli.js"
-  if [[ -f "$cli" ]] && ! grep -q 'R.species=q.species' "$cli" 2>/dev/null; then
-    npx cc-companion --patch-only &>/dev/null
-  fi
-  command claude "$@"
-}
-```
-
-## How it works
-
-Claude Code determines your companion's species and rarity from your account UUID (deterministic, not stored locally). The settings are stored in `~/.claude.json` under the `companion` key, but they're overridden at runtime by the generated "bones."
-
-This script patches one function in `cli.js` (`vC()`) to flip the merge order so your `~/.claude.json` settings take priority. It also replaces the dragon ASCII art with a custom 魏征-themed design (官帽 + long beard).
-
-## Notes
-
-- The patch targets a specific function signature in `cli.js` and may break on future versions of claude-code. Run `--patch-only` to re-apply.
-- The companion name `~/.claude.json` is also used in the system prompt sent to Claude, so Claude will know your companion's name.
-- Only the `dragon` species has a custom art override. Other species use their default art.
+MIT
